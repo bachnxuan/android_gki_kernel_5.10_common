@@ -628,7 +628,7 @@ static struct elevator_type *elevator_get_default(struct request_queue *q)
 	if (q->nr_hw_queues != 1)
 		return NULL;
 
-	return elevator_get(q, "mq-deadline", false);
+	return elevator_get(q, "ssg", false);
 }
 
 /*
@@ -679,6 +679,8 @@ void elevator_init_mq(struct request_queue *q)
 		e = elevator_get(q, "bfq", false);
 	} else if (IS_ENABLED(CONFIG_MQ_KYBER_DEFAULT)) {
 		e = elevator_get(q, "kyber", false);
+	} else if (IS_ENABLED(CONFIG_MQ_SSG_DEFAULT)) {
+		e = elevator_get(q, "ssg", false);
 	} else if (IS_ENABLED(CONFIG_NONE_DEFAULT)) {
 		e = elevator_get(q, "none", false);
 	} else if (!q->required_elevator_features)
