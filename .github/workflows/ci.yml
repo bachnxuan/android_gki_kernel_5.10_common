@@ -55,9 +55,9 @@ jobs:
           git clone $AOSP_MIRROR/kernel/prebuilts/build-tools -b $BRANCH --depth 1 kernel-build-tools
           git clone $AOSP_MIRROR/platform/system/tools/mkbootimg -b $BRANCH --depth 1 mkbootimg
           mkdir clang-tc && cd clang-tc
-          wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/tags/android-12.0.0_r12/clang-r416183b1.tar.gz
-          tar -xvzf clang-r416183b1.tar.gz
-          rm -rf clang-r416183b1.tar.gz
+          wget https://github.com/ZyCromerZ/Clang/releases/download/20.0.0git-20250129-release/Clang-20.0.0git-20250129.tar.gz
+          tar -xvzf Clang-20.0.0git-20250129.tar.gz
+          rm -rf Clang-20.0.0git-20250129.tar.gz
       - name: Set boot sign key
         env:
           BOOT_SIGN_KEY: ${{ secrets.BOOT_SIGN_KEY }}
