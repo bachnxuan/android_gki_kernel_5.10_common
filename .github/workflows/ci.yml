@@ -3,9 +3,9 @@ name: Kernel CI
 on:
   workflow_dispatch:
   push:
-    branches: ["esk"]
+    branches: ["non-mglru"]
   pull_request:
-    branches: ["esk"]
+    branches: ["non-mglru"]
 
 jobs:
   build:
