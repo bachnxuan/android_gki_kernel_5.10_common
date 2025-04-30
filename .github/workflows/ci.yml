@@ -3,9 +3,9 @@ name: Kernel CI
 on:
   workflow_dispatch:
   push:
-    branches: ["non-mglru"]
+    branches: ["kernelsu"]
   pull_request:
-    branches: ["non-mglru"]
+    branches: ["kernelsu"]
 
 jobs:
   build:
@@ -37,12 +37,12 @@ jobs:
           sudo apt install bc bison ccache curl flex git lld binutils make cpio python3 python-is-python3 tar wget lz4 unzip -y
           git clone https://github.com/bachnxuan/AnyKernel3.git AnyKernel3
           cd AnyKernel3 && rm -rf .git .github && cd ..
-          # Initialize KernelSU-Next submodule
+          # Initialize KernelSU submodule
           git submodule update --init --recursive
-          cd KernelSU-Next
-          git fetch --unshallow origin next-susfs-dev:next-susfs-dev
-          git checkout next-susfs-dev
-          git pull origin next-susfs-dev
+          cd KernelSU
+          git fetch --unshallow origin main:main
+          git checkout main
+          git pull origin main
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
