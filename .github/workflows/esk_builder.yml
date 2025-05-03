@@ -15,7 +15,6 @@ jobs:
       - name: 🔍 Checkout code & init submodules
         uses: actions/checkout@v4
         with:
-          submodules: true
           fetch-depth: 1
 
       - name: 🧹 Free up disk
@@ -33,15 +32,6 @@ jobs:
         uses: hendrikmuhs/ccache-action@v1.2
         with:
           max-size: 7.5G
-
-      - name: ⚡️ Update KernelSU-Next submodule
-        run: |
-          git submodule update --init --recursive KernelSU-Next
-          pushd KernelSU-Next
-            git fetch --unshallow origin next-susfs-dev:next-susfs-dev
-            git checkout next-susfs-dev
-            git pull origin next-susfs-dev
-          popd
 
       - name: 🔢 Fetching commit sha
         run: echo "SHORT_SHA=${GITHUB_SHA::8}" >> $GITHUB_ENV
