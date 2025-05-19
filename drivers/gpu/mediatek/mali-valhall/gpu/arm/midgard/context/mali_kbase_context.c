@@ -132,6 +132,7 @@ int kbase_context_common_init(struct kbase_context *kctx)
 {
 	const unsigned long cookies_mask = KBASE_COOKIE_MASK;
 	int err = 0;
+	struct task_struct *task;
 
 	/* creating a context is considered a disjoint event */
 	kbase_disjoint_event(kctx->kbdev);
@@ -149,30 +150,19 @@ int kbase_context_common_init(struct kbase_context *kctx)
 
 	/* Check if this is a Userspace created context */
 	if (likely(kctx->filp)) {
-		struct pid *pid_struct;
 
 		rcu_read_lock();
-		pid_struct = find_get_pid(kctx->tgid);
-		if (likely(pid_struct)) {
-			struct task_struct *task = pid_task(pid_struct, PIDTYPE_PID);
+		task = current;
 
-			if (likely(task)) {
-				/* Take a reference on the task to avoid slow lookup
-				 * later on from the page allocation loop.
-				 */
-				get_task_struct(task);
-				kctx->task = task;
-			} else {
-				dev_err(kctx->kbdev->dev,
-					"Failed to get task pointer for %s/%d",
-					current->comm, current->pid);
-				err = -ESRCH;
-			}
-
-			put_pid(pid_struct);
+		if (likely(task)) {
+			/* Take a reference on the task to avoid slow lookup
+			 * later on from the page allocation loop.
+			 */
+			get_task_struct(task);
+			kctx->task = task;
 		} else {
 			dev_err(kctx->kbdev->dev,
-				"Failed to get pid pointer for %s/%d",
+				"Failed to get task pointer for %s/%d",
 				current->comm, current->pid);
 			err = -ESRCH;
 		}
