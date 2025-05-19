@@ -3,12 +3,12 @@ name: Kernel Builder
 on:
   workflow_dispatch:
   push:
-    branches: ["esk"]
+    branches: ["esk-lxc-staging"]
   pull_request:
-    branches: ["esk"]
+    branches: ["esk-lxc-staging"]
 
 jobs:
-  esk:
+  lxc:
     runs-on: ubuntu-latest
 
     steps:
@@ -148,148 +148,3 @@ jobs:
           path: |
             android12-5.10.X-lts-${{ env.SHORT_SHA }}-AnyKernel3.zip
             android12-5.10.X-lts-${{ env.SHORT_SHA }}-boot.img
-
-  lxc:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: 🔍 Checkout code & init submodules
-        uses: actions/checkout@v4
-        with:
-          submodules: true
-          fetch-depth: 1
-
-      - name: 🧹 Free up disk
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -qq curl
-          curl -fsSL https://raw.githubusercontent.com/kou/arrow/e49d8ae15583ceff03237571569099a6ad62be32/ci/scripts/util_free_space.sh | bash
-
-      - name: 🔄 Setup swap
-        uses: pierotofy/set-swap-space@v1.0
-        with:
-          swap-size-gb: 8
-  
-      - name: 🛠️ Setup ccache
-        uses: hendrikmuhs/ccache-action@v1.2
-        with:
-          max-size: 7.5G
-
-      - name: ⚡️ Update KernelSU-Next submodule
-        run: |
-          git submodule update --init --recursive KernelSU-Next
-          cd KernelSU-Next
-          git fetch --unshallow origin next-susfs-dev:next-susfs-dev
-          git checkout next-susfs-dev
-          git pull origin next-susfs-dev
-          cd ..
-
-      - name: 🔢 Fetching commit sha
-        run: echo "SHORT_SHA=${GITHUB_SHA::8}" >> $GITHUB_ENV
-
-      - name: 📦 Cache toolchain
-        id: cache-toolchain
-        uses: actions/cache@v3
-        with:
-          path: /opt/toolchain
-          key: ${{ runner.os }}-toolchain
-          restore-keys: |
-            ${{ runner.os }}-toolchain-
-
-      - name: ⚙️ Install dependencies & fetch toolchain
-        if: steps.cache-toolchain.outputs.cache-hit != 'true'
-        run: |
-          sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -qq \
-            bc bison ccache curl flex git tar wget lz4 unzip lld -y
-          
-          mkdir -p /opt/toolchain
-
-          # build-tools
-          git clone --depth 1 -b main-kernel-build-2024 \
-            https://android.googlesource.com/kernel/prebuilts/build-tools \
-            /opt/toolchain/build-tools
-
-          # mkbootimg
-          git clone --depth 1 -b main-kernel-build-2024 \
-            https://android.googlesource.com/platform/system/tools/mkbootimg \
-            /opt/toolchain/mkbootimg
-
-          # clang
-          wget -qO clang.tar.gz \
-            https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz
-          mkdir -p /opt/toolchain/clang
-          tar -xzf clang.tar.gz -C /opt/toolchain/clang
-          rm clang.tar.gz
-
-      - name: 🧭 Apply additional patches
-        run: |
-          echo "Applying multi-manager patch"
-          cd KernelSU-Next
-          wget -qO - https://raw.githubusercontent.com/bachnxuan/kernel_patches/refs/heads/master/next_manager.patch | patch -p1 --forward --fuzz=3
-          cd ..
-      
-          echo "Applying LXC patch"
-          wget -qO - https://raw.githubusercontent.com/bachnxuan/kernel_patches/master/lxc.patch | patch -p1 --forward --fuzz=3
-          
-      - name: 🏗️ Build kernel
-        run: |
-          export USE_CCACHE=1
-          export PATH=/opt/toolchain/clang/bin:$PATH
-          export ARCH=arm64
-          export SUBARCH=arm64
-          export CLANG_TRIPLE="aarch64-linux-gnu-"
-          export CROSS_COMPILE="aarch64-linux-gnu-"
-          export LLVM=1 LLVM_IAS=1
-          export LD=/opt/toolchain/clang/bin/ld.lld
-          export AR=/opt/toolchain/clang/bin/llvm-ar
-          export NM=/opt/toolchain/clang/bin/llvm-nm
-          export OBJCOPY=/opt/toolchain/clang/bin/llvm-objcopy
-          export OBJDUMP=/opt/toolchain/clang/bin/llvm-objdump
-          export STRIP=/opt/toolchain/clang/bin/llvm-strip
-          export KBUILD_BUILD_USER=esk_builder
-
-          make -j$(nproc) CC="ccache clang" CXX="ccache clang++" esk_defconfig O=out
-          make -j$(nproc) CC="ccache clang" CXX="ccache clang++" \
-            CONFIG_LTO_CLANG_THIN=y CONFIG_LTO_CLANG_FULL=n O=out
-
-      - name: 🎁 Package AnyKernel3
-        run: |
-          git clone https://github.com/bachnxuan/AnyKernel3.git AnyKernel3
-          cd AnyKernel3 && rm -rf .git .github
-          cp ../out/arch/arm64/boot/Image.gz .
-          zip -r "../android12-5.10.X-lts-${SHORT_SHA}-lxc-AnyKernel3.zip" .
-
-      - name: 🔒 Build & sign boot image
-        env:
-          BOOT_SIGN_KEY: ${{ secrets.BOOT_SIGN_KEY }}
-        run: |
-          mkdir boot && cd boot
-          echo "$BOOT_SIGN_KEY" > testkey_rsa2048.pem
-          GKI_URL="https://dl.google.com/android/gki/gki-certified-boot-android12-5.10-2025-02_r1.zip"
-          curl -sL "$GKI_URL" -o gki.zip
-          unzip gki.zip
-          python3 /opt/toolchain/mkbootimg/unpack_bootimg.py --boot_img=$(pwd)/boot-5.10.img
-          cp ../out/arch/arm64/boot/Image.gz .
-          python3 /opt/toolchain/mkbootimg/mkbootimg.py \
-            --header_version 4 \
-            --kernel Image.gz \
-            --output boot.img \
-            --ramdisk out/ramdisk \
-            --os_version 12.0.0 \
-            --os_patch_level 2025-02
-          /opt/toolchain/build-tools/linux-x86/bin/avbtool add_hash_footer \
-            --partition_name boot \
-            --partition_size $((64*1024*1024)) \
-            --image boot.img \
-            --algorithm SHA256_RSA2048 \
-            --key ./testkey_rsa2048.pem
-          mv boot.img "../android12-5.10.X-lts-${SHORT_SHA}-lxc-boot.img"
-
-      - name: 🚀 Upload final artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: kernel-lxc
-          path: |
-            android12-5.10.X-lts-${{ env.SHORT_SHA }}-lxc-AnyKernel3.zip
-            android12-5.10.X-lts-${{ env.SHORT_SHA }}-lxc-boot.img
