@@ -3,9 +3,9 @@ name: Kernel Builder
 on:
   workflow_dispatch:
   push:
-    branches: ["esk"]
+    branches: ["esk-non-susfs"]
   pull_request:
-    branches: ["esk"]
+    branches: ["esk-non-susfs"]
 
 jobs:
   esk:
